@@ -1,7 +1,10 @@
 swagger: '2.0'
 info:
   title: Bank Argent API documentation
-  description: Contains all available API endpoints in this codebase
+  description: >-
+    Contains all available API endpoints in this codebase.
+    The endpoints of the Transactions Module are a proposal for phase 2:
+    they are not implemented in the back-end yet.
   version: '1.0.0'
   termsOfService: 'http://swagger.io/terms/'
 host: localhost:3001
@@ -101,6 +104,282 @@ paths:
           description: Invalid Fields
         '500':
           description: Internal Server Error
+  /user/accounts:
+    get:
+      security:
+        - Bearer: []
+      tags:
+        - Transactions Module
+      summary: Get the user's accounts
+      description: >-
+        Proposal (phase 2). Returns all the accounts of the logged-in user with
+        their current balance. Each account is the entry point to its
+        transactions, which is how transactions are grouped by account.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Accounts retrieved successfully
+          schema:
+            $ref: '#/definitions/AccountsResponse'
+        '401':
+          description: Missing, invalid or expired token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 401
+              message: 'Token is missing from header'
+        '500':
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 500
+              message: 'Internal Server Error'
+  /user/accounts/{accountId}/transactions:
+    get:
+      security:
+        - Bearer: []
+      tags:
+        - Transactions Module
+      summary: Get the transactions of an account for a month
+      description: >-
+        Proposal (phase 2). Returns the account summary and the list of its
+        transactions for the requested month, sorted by date (most recent
+        first). Without the `month` parameter, the current month is returned.
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - in: query
+          name: month
+          description: >-
+            Month to retrieve, in the `YYYY-MM` format.
+            Optional: defaults to the current month.
+          required: false
+          type: string
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+          x-example: '2020-02'
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Transactions retrieved successfully
+          schema:
+            $ref: '#/definitions/TransactionsResponse'
+        '400':
+          description: Invalid month format
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 400
+              message: 'Invalid month format, expected YYYY-MM'
+        '401':
+          description: Missing, invalid or expired token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 401
+              message: 'Token is missing from header'
+        '404':
+          description: Account not found (or it does not belong to the user)
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 404
+              message: 'Account not found'
+        '500':
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 500
+              message: 'Internal Server Error'
+  /user/accounts/{accountId}/transactions/{transactionId}:
+    get:
+      security:
+        - Bearer: []
+      tags:
+        - Transactions Module
+      summary: Get the details of a transaction
+      description: >-
+        Proposal (phase 2). Returns all the details of a transaction,
+        including its type, category and note, to be displayed in a
+        separate view.
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - $ref: '#/parameters/TransactionId'
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Transaction retrieved successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        '401':
+          description: Missing, invalid or expired token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 401
+              message: 'Token is missing from header'
+        '404':
+          description: Account or transaction not found (or not owned by the user)
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 404
+              message: 'Transaction not found'
+        '500':
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 500
+              message: 'Internal Server Error'
+    patch:
+      security:
+        - Bearer: []
+      tags:
+        - Transactions Module
+      summary: Add, modify or remove the information of a transaction
+      description: >-
+        Proposal (phase 2). Adds, modifies or removes the category and/or the
+        note of a transaction. Only the fields sent in the body are changed.
+        To remove an information, send it with the value `null`: this is a
+        logical deletion, the transaction itself is never deleted (banking
+        history must be kept). The other fields (date, description, amount,
+        balance, type) are read-only. Returns the updated transaction.
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - $ref: '#/parameters/TransactionId'
+        - in: body
+          name: body
+          description: >-
+            Information to add, modify or remove (at least one field).
+            Examples: `{"categoryId": "food"}` to set the category,
+            `{"note": "Birthday cake"}` to set the note,
+            `{"note": null}` to remove the note.
+          required: true
+          schema:
+            $ref: '#/definitions/TransactionUpdate'
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Transaction information updated successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+          examples:
+            application/json:
+              status: 200
+              message: 'Transaction updated successfully'
+              body:
+                id: '6ab4ef18e5380e28790855d7'
+                accountId: '6ab4ef18e5380e28790855c1'
+                date: '2020-02-27T10:30:00.000Z'
+                description: 'Golden Sun Bakery'
+                amount: -8.00
+                balance: 298.00
+                type: Electronic
+                category:
+                  id: food
+                  name: Food
+                note: null
+        '400':
+          description: >-
+            Invalid fields (empty body, unknown categoryId, note longer than
+            250 characters, or attempt to modify a read-only field)
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 400
+              message: 'Unknown categoryId'
+        '401':
+          description: Missing, invalid or expired token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 401
+              message: 'Token is missing from header'
+        '404':
+          description: Account or transaction not found (or not owned by the user)
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 404
+              message: 'Transaction not found'
+        '500':
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 500
+              message: 'Internal Server Error'
+  /transactions/categories:
+    get:
+      security:
+        - Bearer: []
+      tags:
+        - Transactions Module
+      summary: Get the list of transaction categories
+      description: >-
+        Proposal (phase 2). Returns the categories a user can choose from,
+        used to fill the category dropdown (select) of the transaction view.
+        The list is provided by the API instead of being hard-coded in the
+        front-end, so the bank can add or rename a category without
+        redeploying the application.
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          schema:
+            $ref: '#/definitions/CategoriesResponse'
+        '401':
+          description: Missing, invalid or expired token
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 401
+              message: 'Token is missing from header'
+        '500':
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+          examples:
+            application/json:
+              status: 500
+              message: 'Internal Server Error'
+parameters:
+  AccountId:
+    in: path
+    name: accountId
+    description: ID of the account
+    required: true
+    type: string
+    x-example: '6ab4ef18e5380e28790855c1'
+  TransactionId:
+    in: path
+    name: transactionId
+    description: ID of the transaction
+    required: true
+    type: string
+    x-example: '6ab4ef18e5380e28790855d7'
 securityDefinitions:
   Bearer:
     type: apiKey
@@ -156,3 +435,177 @@ definitions:
     properties:
       userName:
         type: string
+  Account:
+    type: object
+    properties:
+      id:
+        type: string
+        example: '6ab4ef18e5380e28790855c1'
+      name:
+        type: string
+        description: Name of the account
+        example: 'Argent Bank Checking'
+      accountNumber:
+        type: string
+        description: Masked account number (last 4 digits)
+        example: 'x3448'
+      balance:
+        type: number
+        format: double
+        description: Current balance of the account
+        example: 48098.43
+      balanceLabel:
+        type: string
+        description: Label displayed under the balance
+        example: 'Available balance'
+  Category:
+    type: object
+    properties:
+      id:
+        type: string
+        example: food
+      name:
+        type: string
+        description: Label displayed in the dropdown
+        example: Food
+  Transaction:
+    type: object
+    properties:
+      id:
+        type: string
+        example: '6ab4ef18e5380e28790855d7'
+      accountId:
+        type: string
+        example: '6ab4ef18e5380e28790855c1'
+      date:
+        type: string
+        format: date-time
+        example: '2020-02-27T10:30:00.000Z'
+      description:
+        type: string
+        example: 'Golden Sun Bakery'
+      amount:
+        type: number
+        format: double
+        description: Amount of the transaction (negative for a debit)
+        example: -8.00
+      balance:
+        type: number
+        format: double
+        description: Balance of the account right after this transaction
+        example: 298.00
+      type:
+        type: string
+        description: Transaction type (read-only)
+        example: Electronic
+      category:
+        description: Category chosen by the user (null if none)
+        x-nullable: true
+        allOf:
+          - $ref: '#/definitions/Category'
+      note:
+        type: string
+        description: Note added by the user (null if none)
+        x-nullable: true
+        example: 'lorem ipsum'
+  TransactionUpdate:
+    type: object
+    description: >-
+      Editable information of a transaction (at least one field).
+      A field sent with the value null is removed (logical deletion).
+    minProperties: 1
+    properties:
+      categoryId:
+        type: string
+        description: ID of a category returned by GET /transactions/categories, or null to remove it
+        x-nullable: true
+        example: food
+      note:
+        type: string
+        description: Free text, or null to remove it
+        x-nullable: true
+        maxLength: 250
+        example: 'Birthday cake'
+  AccountsResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: 'Accounts retrieved successfully'
+      body:
+        type: array
+        items:
+          $ref: '#/definitions/Account'
+  TransactionsResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: 'Transactions retrieved successfully'
+      body:
+        type: object
+        properties:
+          account:
+            $ref: '#/definitions/Account'
+          month:
+            type: string
+            description: Month of the returned transactions (YYYY-MM)
+            example: '2020-02'
+          transactions:
+            type: array
+            items:
+              $ref: '#/definitions/Transaction'
+  TransactionResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: 'Transaction retrieved successfully'
+      body:
+        $ref: '#/definitions/Transaction'
+  CategoriesResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: 'Categories retrieved successfully'
+      body:
+        type: array
+        items:
+          $ref: '#/definitions/Category'
+        example:
+          - id: food
+            name: Food
+          - id: transport
+            name: Transport
+          - id: shopping
+            name: Shopping
+          - id: housing
+            name: Housing
+          - id: health
+            name: Health
+          - id: leisure
+            name: Leisure
+          - id: other
+            name: Other
+  ErrorResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 404
+      message:
+        type: string
+        example: 'Transaction not found'
